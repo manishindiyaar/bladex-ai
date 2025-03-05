@@ -1,181 +1,191 @@
-# Product Requirements Document (PRD)
-Customer Service Autonomous copilot
+# Customer Service Automation Tool
+> Product Requirements Document (PRD)
 
-Version 1.0
+## 1. Objective 🎯
 
-1. Executive Summary
+Build a powerful business tool that enables:
 
-# Objective
+- **Collection**: Gather customer messages from Telegram (WhatsApp support planned)
+- **Viewing**: Access all chats in a live dashboard
+- **Querying & Acting**: Use natural language for customer data queries and actions
+- **History**: Maintain complete customer interaction history
 
-Build an AI Autonomous customer service platform with copilot that:
+### MVP Focus
+- Telegram integration
+- Basic AI auto-replies
+- Natural language queries
+- Actionable prompts with approval system
 
-Centralizes customer conversations from Telegram (and later WhatsApp).
-Automates responses using Our finetuned LLMs while retaining customer-specific memory.
-Provides businesses with a real-time dashboard to monitor/manage interaction between customers and agents.
+## 2. Core Components 🔧
 
-Key Outcomes
-----------------------------------------------------------------
+### 2.1 Telegram Bot
+- Collects incoming messages
+- Sends AI-generated or human-approved replies
+- Executes customer communication actions
 
-Reduce manual response time by 70% via our advanced finetuned AI system trained on their business data and policies.
-Improve customer satisfaction through personalized, context-aware replies.
-Centralize all customer interactions in a single dashboard. 
+### 2.2 Database (Supabase)
+- Stores messages
+- Maintains customer profiles
+- Manages metadata and contact information
 
-(all the messages being responded by AI agents can be seen in real time Dashboard)
-----------------------------------------------------------------
+### 2.3 AI Brain (LLM)
+- Powers automated replies
+- Parses natural language into structured queries/actions
+- Handles intent recognition
 
-2. Product Scope
+### 2.4 Dashboard
+- Displays live chat interface
+- Provides query/action interface
+- Manages approval workflows
 
-# Core Components
+### 2.5 Query and Action Engine
+- Maps prompts to database functions
+- Handles action approvals
+- Executes communication tasks
 
-Telegram Integration: Ingest messages into the system.
-Supabase Database: Store messages & customer profiles for each customers.
-Advanced super AI agents : Business and company data and policies or any information that human customer supports should all would be stored in Vector DB. (Agentic RAG)
-AI Agents: Generate AI responses and take retrive required data also.
-Business Dashboard: Real-time monitoring/management UI.
+## 3. Data Flow 🔄
 
-3. User Personas
+### 3.1 Message Flow (Customer Interaction)
+1. Customer sends Telegram message
+2. Bot receives and logs in Supabase
+3. AI generates auto-reply (if applicable)
+4. Message appears in Dashboard
 
-Persona	Needs
-Business Owner ->	Monitor conversations, configure automation rules, view analytics
-Support Agent ->	Respond to complex queries, override AI responses
-Customer	-> Get instant, accurate replies via Telegram
+### 3.2 Query Flow (Business Owner)
+1. Owner inputs natural language query
+2. AI Brain parses to database function
+3. Backend executes Supabase query
+4. Dashboard displays results
 
+### 3.3 Action Flow (Business Owner)
+Example: "Send hii to all those people who greeted me today"
 
-4. Functional Requirements
+1. **Prompt Submission**
+   - Owner submits prompt via Dashboard
+   - Backend API processes request
 
-4.1 Telegram Integration
+2. **AI Processing**
+   ```json
+   {
+     "type": "action",
+     "action": "send_message",
+     "message": "hii",
+     "query": {
+       "functionName": "get_customers_by_message_keyword_and_date_range",
+       "parameters": {
+         "keyword": "greet",
+         "start_date": "2025-03-03 00:00:00",
+         "end_date": "2025-03-03 23:59:59"
+       }
+     }
+   }
+   ```
 
-Features
+3. **Execution Flow**
+   - Backend runs query
+   - Shows approval interface
+   - Executes action upon approval
+   - Confirms completion
 
-Message Ingestion: Capture all incoming Telegram messages.
-JSON Formatting: Structure messages as:
+## 4. Database Design 💾
 
+### 4.1 Tables
+
+#### contacts
+| Column | Type | Description |
+|--------|------|-------------|
+| id | int (PK) | Primary identifier |
+| name | text | Customer name |
+| contact_info | text | Telegram chat ID |
+
+#### messages
+| Column | Type | Description |
+|--------|------|-------------|
+| id | int (PK) | Primary identifier |
+| contact_id | int (FK) | Reference to contacts |
+| content | text | Message content |
+| timestamp | datetime | UTC timestamp |
+| direction | enum | "incoming"/"outgoing" |
+
+### 4.2 Query Functions
+
+#### get_customers_by_message_keyword
+- **Returns**: id, name, contact_info
+- **Logic**: Filters by keyword in messages
+
+#### get_customers_by_message_keyword_and_date_range
+- **Returns**: id, name, contact_info
+- **Logic**: Filters by keyword and date range
+- **Example**: "today" = current date 00:00:00 to 23:59:59 UTC
+
+## 5. AI Automation 🤖
+
+### 5.1 Auto-Replies
+- Triggered by incoming messages
+- Context-aware response generation
+- Confidence threshold filtering
+
+### 5.2 Query and Action Parsing
+**Endpoint**: `/api/query`
+
+**Input Format**:
 ```json
-
-{  
-  "user_id": "12345",  
-  "name": "John Doe",  
-  "message": "Where is my order?",  
-  "timestamp": "2024-05-20T14:30:00Z"  
-}  
+{
+  "prompt": "send hii to all those people who greeted me today"
+}
 ```
 
-Webhook Setup: Forward messages to backend API.
+**Process**:
+1. LLM receives:
+   - Database schema
+   - Available functions
+   - Available actions
+   - Current date
 
-Technical Specs
+2. LLM outputs structured JSON
+3. Backend validates and executes
 
-Tools: python-telegram-bot library, Telegram Bot API.
-Security: Message encryption in transit (HTTPS).
+## 6. Human Backup & Error Handling 🛟
 
+### Safety Measures
+- Auto-replies: <80% confidence flagged for review
+- Actions: Require human approval
+- Error logging for debugging
 
-4.2 Supabase Database
-
-Schema Design
-
-Table 1: contacts
-```sql
-Column	Type	Description
-user_id	BIGINT (PK)	Unique Telegram user ID
-name	TEXT	Customer name
-created_at	TIMESTAMPTZ	First contact date
+### Error Responses
+```json
+{
+  "error": "Sorry, I didn't understand that. Try 'send <message> to <query>'."
+}
 ```
 
-Table 2: messages
-```sql
-Column	Type	Description
-id	SERIAL (PK)	Auto-incrementing ID
-user_id	BIGINT	References contacts.user_id
-message	TEXT	Message content
-is_bot	BOOLEAN	AI/human response flag
-timestamp	TIMESTAMPTZ	Message time
-```
+## 7. Dashboard Features 🖥️
 
-Realtime Features
+### Core Features
+- **Chat View**: Live Telegram chat feed
+- **Query/Action Input**: Natural language interface
+- **Results Pane**: Query results display
+- **Action Confirmation**: Approval interface
+- **Status Updates**: Action execution feedback
 
-Enable Supabase Realtime for instant UI updates.
-Row-Level Security (RLS) for data protection.
-4.3 LLM Automation API
+### Interface Elements
+- Text input for queries/actions
+- Results display area
+- Confirmation popups
+- Status notifications
 
-Endpoints
+## 8. Natural Language System 🗣️
 
-```
-POST /process-message
-Input: { "user_id": 12345, "message": "Where's my order?" }
-Process:
-Fetch last 5 messages for context
-Generate response via OpenAI GPT-4
-Output: { "response": "Your order is en route!", "status": "sent" }
-GET /conversation-history?user_id=12345
-Returns full chat history for a customer.
-Integration Flow
+### Supported Actions (MVP)
+- `send_message`: Customer communication
 
-```
+### Processing Flow
+1. LLM parses intent
+2. Backend validates
+3. Query execution
+4. User approval
+5. Action execution
 
-4.4 Business Dashboard
+---
 
-UI Components
-
-Conversation List
-Sidebar with customer names + last message preview.
-Unread message counter badges.
-Chat Interface
-Message bubbles (customer left, AI right).
-Timestamps & LLM processing indicators.
-Automation Controls
-Toggle AI auto-responses on/off.
-Set response tone (Professional/Casual).
-Analytics Panel
-Response time metrics.
-Common query categories.
-Tech Stack
-
-Frontend: Next.js (React), Tailwind CSS
-State Management: Zustand
-Realtime Updates: Supabase JS Client
-5. Data Flow Architecture
-
-Incoming Message Path:
-Copy
-Telegram → Webhook → Backend API → Supabase → LLM → Supabase → Telegram  
-Dashboard Updates:
-Copy
-Supabase Realtime → WebSocket → React State → UI Re-render  
-6. Non-Functional Requirements
-
-Category	Requirements
-Performance	<500ms latency for LLM responses
-Scalability	Handle 1K concurrent conversations
-Security	GDPR compliance, JWT authentication
-Uptime	99.9% SLA for critical components
-7. Milestones & Timeline
-
-Phase	Duration	Deliverables
-Setup	1 Week	Telegram bot, Supabase schema, API skeleton
-Core Development	3 Weeks	Message ingestion, LLM API, Basic dashboard
-Testing	2 Weeks	Load testing, Security audit
-Launch	1 Week	Deployment, Documentation
-8. Risks & Mitigation
-
-Risk	Mitigation
-LLM response latency	Implement response caching
-Telegram API rate limits	Queue system with exponential backoff
-Hallucinated LLM responses	Human-in-the-loop validation step
-9. Success Metrics
-
-Operational:
-90% of messages handled without human intervention.
-Average response time <30 seconds.
-Business:
-40% reduction in support staff workload.
-25% increase in customer retention.
-10. Appendices
-
-A. Tech Stack Details
-
-Backend: Python + FastAPI + Supabase
-LLM: OpenAI GPT-4 (with fallback to GPT-3.5-turbo)
-Infrastructure: Vercel (Frontend), Railway (Backend)
-B. Glossary
-
-RLS: Row-Level Security (Supabase feature)
-Webhook: HTTP callback for real-time notifications
+*Note: This document is subject to updates and revisions as the project evolves.*
